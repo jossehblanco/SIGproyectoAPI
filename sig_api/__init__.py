@@ -12,7 +12,7 @@ welcome_messages = [
 
 
 def create_app():
-    app = Fask(__name__)
+    app = Flask(__name__)
         
     @app.route('/testget', methods=['GET'])
     def welcome():
