@@ -4,15 +4,6 @@ import json
 
 app = Flask(__name__)
 
-
-welcome_messages = [
-    {
-        "id":0,
-        "message" : "Welcome to the Summoner\'s Rift"
-    }
-]
-
-
 def create_app():
     app = Flask(__name__)
 
@@ -38,8 +29,6 @@ def create_app():
 
     @app.route('/', methods=['GET'])
     def root():
-        return "SIG SUPER PODEROSO"
+        return "API PARA EL PROYECTO DE SIG"
     app.config['CONFIG'] = True
     return app
-    
-create_app().run()
