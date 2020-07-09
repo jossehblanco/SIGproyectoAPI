@@ -1,0 +1,131 @@
+DROP TABLE covidp;
+CREATE TABLE covidp(
+	point_id SERIAL NOT NULL PRIMARY KEY,
+	user_id INT,
+	lat decimal,
+	long decimal,
+	cluster_id INT
+)
+
+ALTER TABLE covidp ADD COLUMN geom geometry(Point,3857);
+
+CREATE OR REPLACE FUNCTION updategeom() RETURNS TRIGGER AS $$
+   BEGIN
+	  UPDATE covidp SET geom = ST_SetSRID(ST_MakePoint(long, lat), 3857);
+      RETURN NEW;
+   END; $$
+  LANGUAGE PLPGSQL
+
+CREATE  TRIGGER trigger_covidp AFTER INSERT
+ON covidp
+FOR EACH ROW EXECUTE PROCEDURE updategeom();
+
+
+
+
+
+INSERT INTO covidp(user_id, lat, long) VALUES (1, 13.665704, -89.285922);
+INSERT INTO covidp(user_id, lat, long) VALUES (2, 13.673056, -89.240556);
+INSERT INTO covidp(user_id, lat, long) VALUES (3, 13.673052, -89.540555);
+INSERT INTO covidp(user_id, lat, long) VALUES (4, 13.673055, -89.540555);
+INSERT INTO covidp(user_id, lat, long) VALUES (5, 13.673055, -89.540560);
+INSERT INTO covidp(user_id, lat, long) VALUES (6, 13.673055, -89.540556);
+INSERT INTO covidp(user_id, lat, long) VALUES (7, 13.681128, -89.285328);
+INSERT INTO covidp(user_id, lat, long) VALUES (8, 13.683350, -89.313264);
+INSERT INTO covidp(user_id, lat, long) VALUES (9, 13.681246, -89.312242);
+INSERT INTO covidp(user_id, lat, long) VALUES (10, 13.678872, -89.308631);
+INSERT INTO covidp(user_id, lat, long) VALUES (11, 13.678408, -89.300910);
+
+
+
+POINT(-89.240556 13.673056),
+POINT(-89.540555 13.673052),
+POINT(-89.540555 13.673055),
+POINT(-89.54056 13.673055),
+POINT(-89.540556 13.673055),
+POINT(-89.285328 13.681128),
+POINT(-89.313264 13.68335),
+POINT(-89.312242 13.681246),
+POINT(-89.308631 13.678872),
+POINT(-89.30091 13.678408))
+
+
+CREATE TABLE covid_cluster (
+	cluster_id INT primary KEY NOT NULL,
+	geomcollection geometry,
+	density int,
+	risk_level varchar(50)
+)
+
+
+CREATE OR REPLACE FUNCTION updatecollections() RETURNS TRIGGER AS $$
+   BEGIN
+	DELETE  FROM covid_cluster;
+INSERT INTO covid_cluster (SELECT *, 
+				CASE
+				WHEN density < 20 THEN 'bajo'
+				WHEN density < 50 THEN 'moderado'
+				WHEN density <= 75 THEN 'alto'
+				WHEN density >75 THEN 'extremadamente alto'
+				END AS risk_level
+				FROM
+				(SELECT 
+				ROW_NUMBER() OVER (ORDER BY geom) as cluster_id,  
+				geom as geomcollection, st_numgeometries(geom) as density
+				FROM
+				( SELECT unnest(ST_ClusterWithin(geom, 0.040)) as geom, 
+				 ROW_NUMBER() OVER(ORDER BY 1) AS id 
+				FROM covidp) AS collections) as clustertable);
+      RETURN NEW;
+   END; $$
+LANGUAGE PLPGSQL
+
+
+CREATE TRIGGER trigger_covidcollection AFTER INSERT OR UPDATE
+ON covidp
+EXECUTE PROCEDURE updatecollections();
+
+///
+
+	
+	
+CREATE TABLE covidc(
+	circle_id INT NOT NULL PRIMARY KEY,
+	lat decimal,
+	long decimal,
+	redius double precision,
+	geom geometry	
+)
+
+CREATE OR REPLACE FUNCTION updatecircles() RETURNS TRIGGER AS $$
+   BEGIN
+DELETE FROM covidc;
+ INSERT INTO covidc 
+ SELECT tbla.cluster_id as circle_id,
+split_part(REPLACE (
+		REPLACE (
+		st_astext(center),
+		'POINT(',
+		''
+	),
+		')',
+		''
+	),' ', 2) as lat,
+	split_part(REPLACE (
+		REPLACE (
+		st_astext(center),
+		'POINT(',
+		''
+	),
+		')',
+		''
+	),' ', 1) as long, radius, ST_Buffer(st_minimumboundingcircle(tbla.geomcollection), 0.001) as geom
+ FROM covid_cluster tbla,
+ 	LATERAL ST_MinimumBoundingRadius(tbla.geomcollection) minrad;
+      RETURN NEW;
+   END; $$
+LANGUAGE PLPGSQL
+
+CREATE TRIGGER trigger_covidc AFTER INSERT OR UPDATE
+ON covid_cluster
+EXECUTE PROCEDURE updatecircles();

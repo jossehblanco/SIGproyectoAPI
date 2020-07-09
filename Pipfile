@@ -9,6 +9,9 @@ verify_ssl = true
 flask = "*"
 jsonify = "*"
 gunicorn = "*"
+sqlalchemy = "*"
+flask-sqlalchemy = "*"
+psycopg2 = "*"
 
 [requires]
 python_version = "3.8"
