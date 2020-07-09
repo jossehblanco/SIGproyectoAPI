@@ -18,9 +18,9 @@ class Circle_curated_api(db.Model):
     def tojson(self):
         return { 
             "id": self.circle_id,
-            "lat" : float(self.lat),
-            "long" : float(self.long_),
-            "radius" : float(self.radius),
+            "latitude" : float(self.lat),
+            "longitude" : float(self.long_),
+            "radius" : float(self.radius)*111111,
             "density" : self.density,
             "risk_level" : self.risk_level
         }
